@@ -1,0 +1,15 @@
+{application, redis_global,
+  [{description, "erlang global module impl by redis"},
+    {vsn, "0.0.1"},
+    {registered, []},
+    {mod, {redis_global_app, []}},
+    {applications,
+      [kernel,
+        stdlib
+      ]},
+    {env, []},
+    {modules, []},
+
+    {licenses, ["Apache 2.0"]},
+    {links, []}
+  ]}.
