@@ -15,19 +15,31 @@
 %%====================================================================
 
 start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %%====================================================================
 %% Supervisor callbacks
 %%====================================================================
 
-%% Child :: #{id => Id, start => {M, F, A}}
-%% Optional keys are restart, shutdown, type, modules.
-%% Before OTP 18 tuples must be used to specify a child. e.g.
-%% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, {{one_for_all, 0, 1}, []}}.
+  Proxy = case erlang:whereis(redis_proxy) of
+            Pid when is_pid(Pid) ->
+              [];
+            undefined ->
+              Cfg = find_cfg(),
+              [{redis_proxy, {redis_proxy, start_link, [Cfg]}, permanent, 5000, worker, [redis_proxy]}]
+          end,
+  RG = [{redis_global, {redis_global, start_link, []}, permanent, 5000, worker, [redis_global]}],
+  Children = Proxy ++ RG,
+  {ok, {{one_for_one, 1000, 3600}, Children}}.
 
 %%====================================================================
 %% Internal functions
 %%====================================================================
+
+find_cfg() ->
+  case application:get_env(redis_global, redis) of
+    {ok, V} -> V;
+    _ -> #{}
+  end.
+
