@@ -5,7 +5,9 @@
 %% API
 -export([
   start_link/0,
-  start_link/1
+  start_link/1,
+  start_in_sup/0,
+  start_in_sup/1
 ]).
 
 %% gen_server callbacks
@@ -27,6 +29,12 @@ start_link() ->
 start_link(Name) ->
   SName = redis_global:svr_name(Name),
   gen_server:start_link(SName, ?MODULE, [Name], []).
+
+start_in_sup() ->
+  start_in_sup(?MODULE).
+
+start_in_sup(Name) ->
+  redis_global_sub:start_child(?MODULE, start_link, [Name]).
 
 init([Name]) ->
   process_flag(trap_exit, true),

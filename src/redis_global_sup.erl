@@ -3,7 +3,9 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([
+  start_link/0
+]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -29,9 +31,14 @@ init([]) ->
               Cfg = find_cfg(),
               [{redis_proxy, {redis_proxy, start_link, [Cfg]}, permanent, 5000, worker, [redis_proxy]}]
           end,
+  Sub = [{redis_global_sub, {redis_global_sub, start_link, []}, permanent, 5000, supervisor, [redis_global_sub]}],
   RG = [{redis_global, {redis_global, start_link, []}, permanent, 5000, worker, [redis_global]}],
-  Children = Proxy ++ RG,
-  {ok, {{one_for_one, 1000, 3600}, Children}}.
+  Children = Proxy ++ Sub ++ RG,
+  {ok, {{one_for_one, 1000, 3600}, Children}};
+
+init([_Name]) ->
+  Children = [{?MODULE, {?MODULE, proxy, []}, temporary, 5000, worker, [?MODULE]}],
+  {ok, {{simple_one_for_one, 0, 1}, Children}}.
 
 %%====================================================================
 %% Internal functions

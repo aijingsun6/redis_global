@@ -185,10 +185,11 @@ terminate(Reason, _S) ->
   Self = self(),
   ets:foldl(fun({Name, Pid, Ref}, Acc) ->
     erlang:demonitor(Ref, [flush]),
-    proc_lib:spawn(fun() -> shutdown(Self, Name, Pid) end),
+    proc_lib:spawn(fun() -> shutdown(Self, Name, Pid, Reason) end),
     Acc
             end, [], ?REDIS_GLOBAL_ETS),
   recv_shutdown_sig(0, Total),
+  ?LOG_WARNING("~p terminate ~p procs", [?SERVER, Total]),
   ok.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -249,8 +250,9 @@ set_name(Name, Pid) ->
       no
   end.
 
-shutdown(Self, Name, Pid) ->
-  exit(Pid, shutdown),
+shutdown(Self, Name, Pid, Reason) ->
+  ?LOG_INFO("shuwdown ~ts,~p, reason:~p", [Name, Pid, Reason]),
+  gen:stop(Pid, Reason, infinity),
   case whereis_name_i(Name) of
     Pid -> redis_proxy:q(["DEL", Name]), ok;
     _ -> pass
