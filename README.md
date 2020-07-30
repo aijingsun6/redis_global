@@ -3,8 +3,10 @@ redis_global
 erlang global module impl by redis
 
 
+
 ### usage example
 ```
+$ source deploy_cfg.ini
 $ rebar3 run
 
 1> redis_global_example:start_link(abc).
