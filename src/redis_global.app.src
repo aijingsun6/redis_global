@@ -3,13 +3,10 @@
     {vsn, "0.0.1"},
     {registered, []},
     {mod, {redis_global_app, []}},
-    {applications,
-      [kernel,
-        stdlib
-      ]},
+    {applications, [kernel, stdlib, sasl, poolboy, eredis]},
     {env, []},
     {modules, []},
-
     {licenses, ["Apache 2.0"]},
-    {links, []}
+    {links, [{"GitHub", "https://github.com/aijingsun6/redis_global"}]},
+    {files,[]}
   ]}.

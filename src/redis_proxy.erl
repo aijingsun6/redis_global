@@ -29,14 +29,15 @@
 -define(TIMEOUT, 5000).
 -define(REDIS_LOCK_TIME, 5).
 -define(REDIS_TIMEOUT, 5000).
+-define(TRANS_SLEEP_TIME_MAX, 100).
 
 start_link(Args) ->
   start_link(?SERVER, Args).
 
 start_link(Name, Args) when is_atom(Name), is_map(Args) ->
-  Config = #{worker_module => redis_worker, name =>  {local, Name}, size => ?DEFAULT_POOL_SIZE},
+  Config = #{worker_module => redis_worker, name => {local, Name}, size => ?DEFAULT_POOL_SIZE},
   M = maps:merge(Config, Args),
-  poolboy:start_link(maps:to_list(M));
+  poolboy:start_link(M);
 start_link(Name, Args) when is_list(Args) ->
   start_link(Name, maps:from_list(Args)).
 
@@ -91,6 +92,7 @@ foreach_redis(Name, Cur, Times, REG, CNT, Timeout, Fun) ->
   end.
 
 %% ====================
+%% Fun = {M,F,A} | fun/0 | {fun/x,Args}
 trans(LockName, Fun) when is_binary(LockName) ->
   RandBin = erlang:term_to_binary(erlang:make_ref()),
   trans_i(LockName, RandBin, ?REDIS_LOCK_TIME, Fun).
@@ -100,7 +102,8 @@ trans_i(LockKey, RandBin, LockTime, Fun) ->
     {ok, <<"OK">>} ->
       Ret = case Fun of
               {M, F, A} -> catch apply(M, F, A);
-              _ when is_function(Fun, 0) -> catch Fun()
+              _ when is_function(Fun, 0) -> catch Fun();
+              {F, A} when is_function(F) -> catch erlang:apply(F, A)
             end,
       case redis_proxy:q(["GET", LockKey], ?REDIS_TIMEOUT) of
         {ok, RandBin} -> redis_proxy:q(["DEL", LockKey], ?REDIS_TIMEOUT);
@@ -108,8 +111,14 @@ trans_i(LockKey, RandBin, LockTime, Fun) ->
       end,
       Ret;
     {ok, undefined} ->
+      sleep_random(?TRANS_SLEEP_TIME_MAX),
       trans_i(LockKey, RandBin, LockTime, Fun);
     {error, Msg} ->
-      ?LOG_WARNING("trans ~ts ~p", [LockKey, Msg]),
+      ?LOG_ERROR("trans_error ~ts ~p", [LockKey, Msg]),
+      sleep_random(?TRANS_SLEEP_TIME_MAX),
       trans_i(LockKey, RandBin, LockTime, Fun)
   end.
+
+sleep_random(Max) ->
+  Sleep = rand:uniform(Max),
+  timer:sleep(Sleep).
