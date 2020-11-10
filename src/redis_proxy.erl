@@ -37,7 +37,7 @@ start_link(Args) ->
 start_link(Name, Args) when is_atom(Name), is_map(Args) ->
   Config = #{worker_module => redis_worker, name => {local, Name}, size => ?DEFAULT_POOL_SIZE},
   M = maps:merge(Config, Args),
-  poolboy:start_link(M);
+  poolboy:start_link(maps:to_list(M));
 start_link(Name, Args) when is_list(Args) ->
   start_link(Name, maps:from_list(Args)).
 

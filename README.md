@@ -8,19 +8,37 @@ erlang global module impl by redis
 ```
 $ source deploy_cfg.ini
 $ rebar3 run
+% start server in redis_global_1
+(redis_global_1@localhost)1> redis_global_example:start_link(1).
+{ok,<0.292.0>}
+(redis_global_1@localhost)2> redis_global_example:start_link(2).
+{ok,<0.294.0>}
+(redis_global_1@localhost)3> redis_global_example:start_link(3).
+{ok,<0.296.0>}
+(redis_global_1@localhost)4> redis_global:i().
+redis_global_3
+redis_global_2
+redis_global_4
+redis_global_1
+ok
+% stop server in node redis_global_2
+(redis_global_1@localhost)5> gen_server:stop(redis_global:whereis_name(4)).
+ok
 
-1> redis_global_example:start_link(abc).
-{ok,<0.291.0>}
+======================== node redis_global_2
+(redis_global_2@localhost)1> redis_global:i().
+redis_global_3
+redis_global_2
+redis_global_1
+ok
+(redis_global_2@localhost)2> redis_global_example:start_link(3).
+{error,{already_started,<13969.296.0>}}
+(redis_global_2@localhost)3> redis_global_example:start_link(4).
+{ok,<0.300.0>}
+(redis_global_2@localhost)4> redis_global:whereis_name(1).
+<13969.292.0>
+% server 4 terminate by node redis_global_1 operation
+(redis_global_2@localhost)5> =ERROR REPORT==== 10-Nov-2020::18:42:45.834749 ===
+4 terminate with normal
 
-2> P = redis_global:whereis_name(abc).
-<0.291.0>
-
-3> sys:get_state(P).
-{state,abc}
-
-4> redis_proxy:q(["keys","*"]).
-{ok,[<<"redis_global_abc">>]}
-
-5> ets:tab2list(redis_global_ets).
-[{<<"redis_global_abc">>,<0.291.0>, #Ref<0.875029373.1213464577.7214>}]
 ```
