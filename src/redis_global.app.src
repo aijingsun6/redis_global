@@ -1,6 +1,6 @@
 {application, redis_global,
   [{description, "erlang global module impl by redis"},
-    {vsn, "0.0.2"},
+    {vsn, "0.0.3"},
     {registered, []},
     {mod, {redis_global_app, []}},
     {applications, [kernel, stdlib, sasl, poolboy, eredis]},
@@ -8,5 +8,5 @@
     {modules, []},
     {licenses, ["Apache 2.0"]},
     {links, [{"GitHub", "https://github.com/aijingsun6/redis_global"}]},
-    {files,[]}
+    {files,["src"]}
   ]}.
