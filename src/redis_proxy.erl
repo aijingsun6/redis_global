@@ -22,12 +22,17 @@
 ]).
 
 %% 利用redis自旋锁
--export([trans/2]).
+-export([
+  trans/2,
+  trans/3,
+  trans/5
+]).
 
 -define(SERVER, ?MODULE).
 -define(DEFAULT_POOL_SIZE, 16).
 -define(TIMEOUT, 5000).
--define(REDIS_LOCK_TIME, 5).
+-define(REDIS_LOCK_TIME, 5000).
+-define(REDIS_TRANS_TIMEOUT, infinity).
 -define(REDIS_TIMEOUT, 5000).
 -define(TRANS_SLEEP_TIME_MAX, 100).
 
@@ -93,32 +98,57 @@ foreach_redis(Name, Cur, Times, REG, CNT, Timeout, Fun) ->
 
 %% ====================
 %% Fun = {M,F,A} | fun/0 | {fun/x,Args}
+%% @return {ok, Result} | {error,timeout}
 trans(LockName, Fun) when is_binary(LockName) ->
+  trans(?SERVER, LockName, Fun, ?REDIS_LOCK_TIME, ?REDIS_TRANS_TIMEOUT).
+
+trans(Name, LockName, Fun) when is_binary(LockName) ->
+  trans(Name, LockName, Fun, ?REDIS_LOCK_TIME, ?REDIS_TRANS_TIMEOUT).
+
+trans(Name, LockName, Fun, LockTime, Timeout) when Timeout =:= infinity ->
   RandBin = erlang:term_to_binary(erlang:make_ref()),
-  trans_i(LockName, RandBin, ?REDIS_LOCK_TIME, Fun).
+  trans_i(Name, LockName, RandBin, Fun, LockTime, infinity);
+trans(Name, LockName, Fun, LockTime, Timeout) when is_integer(Timeout) ->
+  RandBin = erlang:term_to_binary(erlang:make_ref()),
+  Now = os:perf_counter(millisecond),
+  EndTime = Now + Timeout,
+  trans_i(Name, LockName, RandBin, Fun, LockTime, EndTime).
 
-trans_i(LockKey, RandBin, LockTime, Fun) ->
-  case redis_proxy:q(["SET", LockKey, RandBin, "EX", erlang:integer_to_list(LockTime), "NX"], ?REDIS_TIMEOUT) of
-    {ok, <<"OK">>} ->
-      Ret = case Fun of
-              {M, F, A} -> catch apply(M, F, A);
-              _ when is_function(Fun, 0) -> catch Fun();
-              {F, A} when is_function(F) -> catch erlang:apply(F, A)
+trans_i(Name, LockKey, RandBin, Fun, LockTime, EndTime) ->
+  Now = os:perf_counter(millisecond),
+  Timeout = case EndTime of
+              infinity -> false;
+              _ -> Now >= EndTime
             end,
-      case redis_proxy:q(["GET", LockKey], ?REDIS_TIMEOUT) of
-        {ok, RandBin} -> redis_proxy:q(["DEL", LockKey], ?REDIS_TIMEOUT);
-        _ -> pass
-      end,
-      Ret;
-    {ok, undefined} ->
-      sleep_random(?TRANS_SLEEP_TIME_MAX),
-      trans_i(LockKey, RandBin, LockTime, Fun);
-    {error, Msg} ->
-      ?LOG_ERROR("trans_error ~ts ~p", [LockKey, Msg]),
-      sleep_random(?TRANS_SLEEP_TIME_MAX),
-      trans_i(LockKey, RandBin, LockTime, Fun)
+  if
+    Timeout ->
+      {error, timeout};
+    _ ->
+      case redis_proxy:q(Name, ["SET", LockKey, RandBin, "PX", erlang:integer_to_list(LockTime), "NX"], ?REDIS_TIMEOUT) of
+        {ok, <<"OK">>} ->
+          Ret = case Fun of
+                  {M, F, A} -> catch apply(M, F, A);
+                  {F, A} when is_function(F) -> catch erlang:apply(F, A);
+                  _ when is_function(Fun, 0) -> catch Fun()
+                end,
+          case redis_proxy:q(Name, ["GET", LockKey], ?REDIS_TIMEOUT) of
+            {ok, RandBin} -> redis_proxy:q(Name, ["DEL", LockKey], ?REDIS_TIMEOUT);
+            _ -> pass
+          end,
+          {ok, Ret};
+        {ok, undefined} ->
+          Left = EndTime - os:perf_counter(millisecond),
+          if
+            Left =< 1 ->
+              {error, timeout};
+            true ->
+              Random = rand:uniform(?TRANS_SLEEP_TIME_MAX),
+              Sleep = erlang:min(Random, Left - 1),
+              timer:sleep(Sleep),
+              trans_i(Name, LockKey, RandBin, Fun, LockTime, EndTime)
+          end;
+        Err ->
+          % redis error
+          Err
+      end
   end.
-
-sleep_random(Max) ->
-  Sleep = rand:uniform(Max),
-  timer:sleep(Sleep).

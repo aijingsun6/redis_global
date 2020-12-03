@@ -216,7 +216,8 @@ unregister_name_i(Name, Pid) when is_binary(Name) ->
       Pid -> redis_proxy:q(["DEL", Name]);
       _ -> pass
     end end,
-  redis_proxy:trans(LockKey, F).
+  {ok, Result} = redis_proxy:trans(LockKey, F),
+  Result.
 
 %% yes | no
 register_name_i(Name, Pid) when is_binary(Name) ->
@@ -234,7 +235,8 @@ register_name_i(Name, Pid) when is_binary(Name) ->
     end
       end,
 
-  redis_proxy:trans(LockKey, F).
+  {ok, Result} = redis_proxy:trans(LockKey, F),
+  Result.
 
 %% yes | no
 set_name(Name, Pid) ->
