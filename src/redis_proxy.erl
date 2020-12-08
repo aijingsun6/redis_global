@@ -123,7 +123,7 @@ trans_i(Name, LockKey, RandBin, Fun, LockTime, EndTime) ->
   if
     Timeout ->
       {error, timeout};
-    _ ->
+    true ->
       case redis_proxy:q(Name, ["SET", LockKey, RandBin, "PX", erlang:integer_to_list(LockTime), "NX"], ?REDIS_TIMEOUT) of
         {ok, <<"OK">>} ->
           Ret = case Fun of
