@@ -90,7 +90,8 @@ unregister_name(Name) ->
   end.
 
 unregister_name(Name, Pid) ->
-  gen_server:call(?SERVER, {unregister_name, Name, Pid}, ?CALL_TIMEOUT).
+  RedisName = to_redis_name(Name),
+  gen_server:call(?SERVER, {unregister_name, RedisName, Pid}, ?CALL_TIMEOUT).
 
 is_process_alive(Pid) when is_pid(Pid) ->
   Node = erlang:node(Pid),
