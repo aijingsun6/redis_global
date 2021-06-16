@@ -1,6 +1,6 @@
 {application, redis_global,
   [{description, "erlang global module impl by redis"},
-    {vsn, "0.0.4"},
+    {vsn, "0.0.5"},
     {registered, []},
     {mod, {redis_global_app, []}},
     {applications, [kernel, stdlib, sasl, poolboy, eredis]},
