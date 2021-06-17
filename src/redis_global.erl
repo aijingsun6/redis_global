@@ -124,7 +124,7 @@ init([]) ->
   ets:new(?REDIS_GLOBAL_ETS, [named_table, set, {read_concurrency, true}]),
   {ok, #state{}}.
 
-handle_call({unregister_name, RedisName, Pid}, _From, #state{monitor_map = M} = S) when is_binary(RedisName) ->
+handle_call({unregister_name, RedisName, Pid}, From, #state{monitor_map = M} = S) when is_binary(RedisName) ->
   ?LOG_DEBUG("unregister_name,~ts,~p", [RedisName, Pid]),
   M2 = case ets:lookup(?REDIS_GLOBAL_ETS, RedisName) of
          [] -> M;
@@ -134,8 +134,8 @@ handle_call({unregister_name, RedisName, Pid}, _From, #state{monitor_map = M} = 
            maps:remove(Ref, M);
          [_] -> M
        end,
-  proc_lib:spawn(fun() -> unregister_name_i(RedisName, Pid) end),
-  {reply, ok, S#state{monitor_map = M2}};
+  proc_lib:spawn(fun() -> Reply = unregister_name_i(RedisName, Pid), gen_server:reply(From,Reply) end),
+  {noreply, S#state{monitor_map = M2}};
 handle_call({register_name, RedisName, Pid}, _From, #state{monitor_map = M} = S) when is_binary(RedisName) ->
   ?LOG_DEBUG("register_name,~ts,~p", [RedisName, Pid]),
   R = register_name_i(RedisName, Pid),
