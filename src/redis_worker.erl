@@ -2,14 +2,21 @@
 -export([start_link/1]).
 
 start_link(Args) when is_list(Args) ->
-  Host = proplists:get_value(host, Args, "127.0.0.1"),
-  Port = proplists:get_value(port, Args, 6379),
-  Database = proplists:get_value(database, Args, 0),
-  Password = proplists:get_value(password, Args, ""),
-  eredis:start_link(Host, Port, Database, Password);
+  start_link(maps:from_list(Args));
 start_link(Args) when is_map(Args) ->
-  Host = maps:get(host, Args, "127.0.0.1"),
-  Port = maps:get(port, Args, 6379),
-  Database = maps:get(database, Args, 0),
-  Password = maps:get(password, Args, ""),
-  eredis:start_link(Host, Port, Database, Password).
+  M = to_opts(Args),
+  eredis:start_link(maps:to_list(M)).
+
+to_opts(M) ->
+  L = [host, port, database, username, password, reconnect_sleep, connect_timeout, socket_options, tls],
+  M2 = maps:with(L, M),
+  M3 = remove_undefined(username, M2),
+  remove_undefined(password, M3).
+
+remove_undefined(K, M) ->
+  case maps:get(K, M, undefined) of
+    undefined -> maps:remove(K, M);
+    <<"undefined">> -> maps:remove(K, M);
+    "undefined" -> maps:remove(K, M);
+    _ -> M
+  end.
