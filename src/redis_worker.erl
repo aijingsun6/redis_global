@@ -2,21 +2,29 @@
 -export([start_link/1]).
 
 start_link(Args) when is_list(Args) ->
-  start_link(maps:from_list(Args));
+  eredis:start_link(to_opts(Args, []));
 start_link(Args) when is_map(Args) ->
-  M = to_opts(Args),
-  eredis:start_link(maps:to_list(M)).
+  Opts = to_opts(maps:to_list(Args), []),
+  eredis:start_link(Opts).
 
-to_opts(M) ->
-  L = [host, port, database, username, password, reconnect_sleep, connect_timeout, socket_options, tls],
-  M2 = maps:with(L, M),
-  M3 = remove_undefined(username, M2),
-  remove_undefined(password, M3).
+to_opts([], Acc) ->
+  Acc;
 
-remove_undefined(K, M) ->
-  case maps:get(K, M, undefined) of
-    undefined -> maps:remove(K, M);
-    <<"undefined">> -> maps:remove(K, M);
-    "undefined" -> maps:remove(K, M);
-    _ -> M
+to_opts([{K, V} | L], Acc) when K =:= username; K =:= password ->
+  if
+    is_binary(V) andalso V =/= <<>> -> to_opts(L, [{K, V} | Acc]);
+    is_list(V) andalso V =/= [] -> to_opts(L, [{K, V} | Acc]);
+    true -> to_opts(L, Acc)
+  end;
+
+to_opts([{K, V} | L], Acc) ->
+  KS = [host, port, database, reconnect_sleep, connect_timeout, socket_options, tls],
+  IsKey = lists:member(K, KS),
+  if
+    IsKey ->
+      to_opts(L, [{K, V} | Acc]);
+    true ->
+      to_opts(L, Acc)
   end.
+
+
